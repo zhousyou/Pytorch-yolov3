@@ -1,3 +1,13 @@
 num_anchors = 9
 num_classes = 20
 voc_classes = 'model_data/voc_classes.txt'
+data_dir = 'VOCdevkit/VOC2007'
+img_size = 416
+batch_size = 8
+epochs = 100
+learning_rate = 1e-4
+min_lr = 1e-6
+weight_decay = 5e-4
+save_interval = 5
+output_dir = 'voc_checkpoints'
+early_stopping_patience = 10
