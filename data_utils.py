@@ -107,11 +107,11 @@ class VOCDataset(Dataset):
 
             # 应用变换
             transformed = self.transform(
-                img = img,
+                image = img,
                 bboxes = albumentations_boxes,
                 class_labels = labels.tolist()
             )
-            image = transformed['img']
+            image = transformed['image']
             if len(transformed['bboxes']) > 0:
                 # 转换回YOLO格式
                 new_boxes = []
@@ -289,3 +289,7 @@ if __name__ == "__main__":
     VOCDataset(data_dir=data_dir,
                split='train')
     train, val = create_voc_dataloaders(data_dir=data_dir)
+    for imgs, targets in train:
+        print(imgs.shape)
+        print(targets.shape)
+        break

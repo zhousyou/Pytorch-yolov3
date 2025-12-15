@@ -33,8 +33,9 @@ class YOLOLoss(nn.Module):
         class_loss = 0
 
         for scale_idx, pred in enumerate(predictions):
-            batch_size = pred[0]    # 获取当前输出的批次
-            grid_size = pred[2]     # 获取输出的尺度
+            # print(f"Debug Info: pred shape at scale {scale_idx}: {pred.shape}")
+            batch_size = pred.size(0)    # 获取当前输出的批次
+            grid_size = pred.size(2)     # 获取输出的尺度
 
             # 获取当前尺度的锚点框
             scale_anchors = self.anchors[scale_idx]
@@ -45,17 +46,29 @@ class YOLOLoss(nn.Module):
 
             # 解析预测
             pred_boxes = pred[..., :4]  # x,y,w,h
-            pred_obj = pred[..., 4:5]   # 目标置信度
+            pred_obj = pred[..., 4]   # 目标置信度
             pred_class = pred[..., 5:]  # 类别概率
 
             # 解析目标
             target_boxes = targer_tensor[..., :4]   # x,y,w,h
-            target_obj = targer_tensor[..., 4:5]  # 置信度
+            target_obj = targer_tensor[..., 4]  # 置信度
             target_class = targer_tensor[..., 5:]   #类别概率
-
+            # print(f"Debug Info: target_obj shape at scale {scale_idx}: {target_obj.shape}")
             # 计算掩码  ?
             obj_mask = target_obj == 1
             noobj_mask = target_obj == 0
+
+            # # 调试信息
+            # print(f"调试信息 - Scale {scale_idx}:")
+            # print(f"  Pred Boxes Shape: {pred_boxes.shape}")
+            # print(f" obj_mask shape: {obj_mask.shape}, obj_mask sum: {obj_mask.sum().item()}")
+
+            # # 检查索引操作的结果
+            # if obj_mask.sum() > 0:
+            #     indexed_pred_boxes = pred_boxes[obj_mask]
+            #     indexed_target_boxes = target_boxes[obj_mask]
+            #     print(f"  Indexed Pred Boxes Shape: {indexed_pred_boxes.shape}")
+            #     print(f"  Indexed Target Boxes Shape: {indexed_target_boxes.shape}")
 
             # 计算坐标的损失
             if obj_mask.sum() > 0:
@@ -99,34 +112,35 @@ class YOLOLoss(nn.Module):
         total_loss /= batch_size
 
         return total_loss, {
-            'total': total_loss.item(),
-            'coord': coord_loss.item() / batch_size,
-            'obj': obj_loss.item() / batch_size,
-            'noobj': noobj_loss.item() / batch_size,
-            'class': class_loss.item() / batch_size
+            'total_loss': total_loss.item(),
+            'coord_loss': coord_loss.item() / batch_size,
+            'obj_loss': obj_loss.item() / batch_size,
+            'noobj_loss': noobj_loss.item() / batch_size,
+            'class_loss': class_loss.item() / batch_size
         }
     
     def build_targets(self, predictions, targets, anchors, grid_size, scale_idx):
         """
             构建目标张量
         """
-        batch_size = predictions[0]
+        batch_size = predictions.size(0)
         num_anchors = len(anchors)
-
+        
         # 初始化目标张量
         target_tensor = torch.zeros(
             batch_size, num_anchors, grid_size, grid_size, 5 + self.num_classes,
             device=predictions.device
         )
-
+        
+        
         # 将锚点框缩放到当前网格尺度
         scale_anchors = torch.tensor(anchors, device=predictions.device).float() / (self.img_size * self.img_size)
 
         # 遍历批次中的每个图像
         for batch_idx in range(batch_size):
             target = targets[batch_idx]
-            boxes = targets['boxes']
-            labels = targets['labels']
+            boxes = target['boxes']
+            labels = target['labels']
 
             if len(boxes) == 0:
                 continue

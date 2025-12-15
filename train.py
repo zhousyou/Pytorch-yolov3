@@ -15,7 +15,7 @@ class YOLOV3_trainer:
         self.model = model
         self.train_loader = train_loader
         self.val_loader = val_loader
-        self.device = self.device
+        self.device = device
         
         anchors = [
             [(116, 90), (156, 198), (373, 326)],   # 13x13
@@ -66,12 +66,13 @@ class YOLOV3_trainer:
 
         pbar = tqdm(self.train_loader, desc=f'Epoch{self.cur_epoch}')
 
-        for batch_idx, (images, targets) in pbar:
+        for batch_idx, (images, targets) in enumerate(pbar):
             images = images.to(self.device)
 
             # 前向传播
             self.optimizer.zero_grad()
             outputs = self.model(images)
+            
 
             # 计算损失
             loss, loss_item = self.criterion(outputs, targets)
@@ -85,7 +86,7 @@ class YOLOV3_trainer:
             self.optimizer.step()
 
             total_loss += loss.item()
-            for key in loss_dict:
+            for key in loss_dict.keys():
                 loss_dict[key] += loss_item[key]
             
             # 更新进度条
@@ -178,8 +179,8 @@ class YOLOV3_trainer:
 
             print(f"训练损失:{train_loss:.4f}")
             print(f"验证损失:{val_loss:.4f}")
-            print(f"训练损失分量:{train_loss_dict:.4f}")
-            print(f"验证损失分量:{val_loss_dict:.4f}")
+            print(f"训练损失分量:{train_loss_dict}")
+            print(f"验证损失分量:{val_loss_dict}")
             print(f"学习率:{self.optimizer.param_groups[0]['lr']:.6f}")
 
             # 保存检查点
