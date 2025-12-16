@@ -36,9 +36,10 @@ class YOLOLoss(nn.Module):
             # print(f"Debug Info: pred shape at scale {scale_idx}: {pred.shape}")
             batch_size = pred.size(0)    # 获取当前输出的批次
             grid_size = pred.size(2)     # 获取输出的尺度
+            stride = self.img_size / grid_size  # 计算当前尺度的步幅（32，16，8）
 
             # 获取当前尺度的锚点框
-            scale_anchors = self.anchors[scale_idx]
+            scale_anchors = torch.tensor(self.anchors[scale_idx], device=pred.device).float()/stride
 
 
             # 构建目标张量
@@ -119,12 +120,12 @@ class YOLOLoss(nn.Module):
             'class_loss': class_loss.item() / batch_size
         }
     
-    def build_targets(self, predictions, targets, anchors, grid_size, scale_idx):
+    def build_targets(self, predictions, targets, scaled_anchors, grid_size, scale_idx):
         """
             构建目标张量
         """
         batch_size = predictions.size(0)
-        num_anchors = len(anchors)
+        num_anchors = len(scaled_anchors)
         
         # 初始化目标张量
         target_tensor = torch.zeros(
@@ -133,8 +134,8 @@ class YOLOLoss(nn.Module):
         )
         
         
-        # 将锚点框缩放到当前网格尺度
-        scale_anchors = torch.tensor(anchors, device=predictions.device).float() / (self.img_size * self.img_size)
+        # # 将锚点框缩放到当前网格尺度
+        # scale_anchors = torch.tensor(anchors, device=predictions.device).float() / (self.img_size * self.img_size)
 
         # 遍历批次中的每个图像
         for batch_idx in range(batch_size):
@@ -145,6 +146,9 @@ class YOLOLoss(nn.Module):
             if len(boxes) == 0:
                 continue
             
+            # gxy = boxes[:, :2] * grid_size  # 计算中心点在网格上的位置
+            # gwh = boxes[:, 2:] * grid_size  # 计算宽高在网格上的大小
+
             # 遍历每个真实边界框
             # 为每个目标找到匹配的锚点框
             for box_idx, (box, label) in enumerate(zip(boxes, labels)):
@@ -160,13 +164,13 @@ class YOLOLoss(nn.Module):
 
                 # 计算与锚点框的IOU
                 ious = []
-                for anchor_idx, anchor in enumerate(scale_anchors):
+                for anchor_idx, anchor in enumerate(scaled_anchors):
                     anchor_w, anchor_h = anchor
                     # 计算IOU
-                    inter_w = min(width * self.img_size, anchor_w)
-                    inter_h = min(height * self.img_size, anchor_h)
+                    inter_w = min(width * grid_size, anchor_w)
+                    inter_h = min(height * grid_size, anchor_h)
                     inter_area = inter_w * inter_h
-                    union_area = anchor_w * anchor_h + width * self.img_size + height * self.img_size - inter_area
+                    union_area = anchor_w * anchor_h + width * grid_size + height * grid_size - inter_area
                     iou = inter_area / union_area if union_area > 0 else 0
                     ious.append(iou)
 
@@ -176,8 +180,8 @@ class YOLOLoss(nn.Module):
                 # 设置目标值. [batch, num_anchors, gridsize, gridsize, 5+numclasses]
                 target_tensor[batch_idx, best_anchor, grid_y, grid_x, 0] = x_center * grid_size - grid_x    # 中心点x的偏移量
                 target_tensor[batch_idx, best_anchor, grid_y, grid_x, 1] = y_center * grid_size - grid_y    # 中心点y的偏移量
-                target_tensor[batch_idx, best_anchor, grid_y, grid_x, 2] = width * self.img_size / scale_anchors[best_anchor][0]    #w
-                target_tensor[batch_idx, best_anchor, grid_y, grid_x, 3] = height * self.img_size / scale_anchors[best_anchor][1]    #h
+                target_tensor[batch_idx, best_anchor, grid_y, grid_x, 2] = width * grid_size / scaled_anchors[best_anchor][0]    #w
+                target_tensor[batch_idx, best_anchor, grid_y, grid_x, 3] = height * grid_size / scaled_anchors[best_anchor][1]    #h
                 target_tensor[batch_idx, best_anchor, grid_y, grid_x, 4] = 1    # 置信度
                 target_tensor[batch_idx, best_anchor, grid_y, grid_x, 5 + label] = 1    #类别概率
 
