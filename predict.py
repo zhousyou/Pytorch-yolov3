@@ -94,7 +94,7 @@ class YoloV3Predictor:
         preprocessed_img = self.preprocess_images(img_path)
 
         # 移动图像到计算设备
-        img_tensor = preprocessed_img['tensor_img'].to(self.device)
+        img_tensor = preprocessed_img['tensor_image'].to(self.device)
 
         # 模型推理
         self.model.eval()
@@ -142,7 +142,7 @@ class YoloV3Predictor:
             box_xy[:, 3] *= scale_h
 
             # 将结果添加到检测列表
-            for i in range(box_xy):
+            for i in range(len(box_xy)):
                 detection = {
                     'bbox': box_xy[i].cpu().numpy(),
                     'score': scores[i].item(),
@@ -207,7 +207,7 @@ class YoloV3Predictor:
         
         return keep
     
-    def visualize_detections(self, img_path, save_path = None, show_labels = True, show_scores = True, thickness = 0.2, font_scale = 0.5):
+    def visualize_detections(self, img_path, save_path = None, show_labels = True, show_scores = True, thickness = 2, font_scale = 0.5):
         """
         可视化检测结果
         
@@ -231,10 +231,12 @@ class YoloV3Predictor:
 
         # 绘制边界框
         for det in detections:
-            boxes = det['bbox']
+            boxes = det['bbox'].astype(int)
             scores = det['score']
             class_id = det['class_id']
             class_name = det['class_name']
+
+            print(class_name)
 
             # 获取颜色
             color = self.colors[class_id]
@@ -248,14 +250,18 @@ class YoloV3Predictor:
             
         
         # 显示结果
-        fig, axes = plt.subplot(1, 2)
+        fig, axes = plt.subplots(1, 2, figsize=(8,16))
 
         # 原始图像
         axes[0].imshow(original_img)
+        axes[0].set_title('Original image')
+        axes[0].axis('off')
 
         # 检测后图像
         axes[1].imshow(image_with_boxes)
-
+        axes[1].set_title(f'Detection ({len(detections)} objects)')
+        axes[1].axis('off')
+        plt.tight_layout()
         plt.show()
 
 if __name__ == "__main__":
@@ -265,8 +271,8 @@ if __name__ == "__main__":
     
     model = YoloV3(20).to(device)
     checkpoint = torch.load('best_model.pth', map_location=device)
-    model.load_state_dict(checkpoint)
+    model.load_state_dict(checkpoint['model_state_dict'])
     yolopredict = YoloV3Predictor(model, device)
-    img_path = "VOCdevkit/VOC2007/JPEGImages/000005.jpg"
-    yolopredict.visualize_detections()
+    img_path = "/root/Pytorch-yolov3/test_img/000005.jpg"
+    yolopredict.visualize_detections(img_path)
 
